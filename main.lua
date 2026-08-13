@@ -6,7 +6,7 @@ local TweenService = game:GetService("TweenService")
 
 -- 1. PANGGIL TAMPILAN HUD (WAJIB GANTI LINK INI!)
 -- Ganti tulisan "LINK_RAW_HUD_LUA_ANDA" dengan link raw file hud.lua Anda di GitHub
-local HUD = loadstring(game:HttpGet("LINK_RAW_HUD_LUA_ANDA"))()
+local HUD = loadstring(game:HttpGet("https://raw.githubusercontent.com/Adit013/Eternal-HUB/main/hud.lua"))()
 
 -- ==========================================
 -- FUNGSI BANTUAN PEMBUAT UI (TOMBOL, SLIDER, DROPDOWN)
