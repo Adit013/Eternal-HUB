@@ -379,12 +379,89 @@ local function CreateTab(tabName)
     return Page
 end
 
+-- ==========================================
+-- POP-UP UNLOAD CONFIRMATION (VELLURE STYLE)
+-- ==========================================
+local UnloadOverlay = Instance.new("Frame")
+UnloadOverlay.Size = UDim2.new(1, 0, 1, 0)
+UnloadOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+UnloadOverlay.BackgroundTransparency = 1 -- Default invisible
+UnloadOverlay.Visible = false
+UnloadOverlay.ZIndex = 50
+UnloadOverlay.Parent = MainFrame
+Instance.new("UICorner", UnloadOverlay).CornerRadius = UDim.new(0, 15)
+
+local UnloadPopup = Instance.new("Frame")
+UnloadPopup.Size = UDim2.new(0, 250, 0, 120)
+UnloadPopup.Position = UDim2.new(0.5, -125, 0.5, -60)
+UnloadPopup.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+UnloadPopup.ZIndex = 51
+UnloadPopup.Parent = UnloadOverlay
+Instance.new("UICorner", UnloadPopup).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", UnloadPopup).Color = Color3.fromRGB(60, 60, 60)
+
+local PopupTitle = Instance.new("TextLabel")
+PopupTitle.Size = UDim2.new(1, -30, 0, 30)
+PopupTitle.Position = UDim2.new(0, 15, 0, 10)
+PopupTitle.BackgroundTransparency = 1
+PopupTitle.Text = "Unload\nClose Vellure?"
+PopupTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+PopupTitle.Font = Enum.Font.GothamMedium
+PopupTitle.TextSize = 13
+PopupTitle.TextXAlignment = Enum.TextXAlignment.Left
+PopupTitle.ZIndex = 52
+PopupTitle.Parent = UnloadPopup
+
+local ConfirmBtn = Instance.new("TextButton")
+ConfirmBtn.Size = UDim2.new(0.4, 0, 0, 30)
+ConfirmBtn.Position = UDim2.new(0, 15, 1, -45)
+ConfirmBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ConfirmBtn.Text = "Unload"
+ConfirmBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+ConfirmBtn.Font = Enum.Font.GothamSemibold
+ConfirmBtn.TextSize = 12
+ConfirmBtn.ZIndex = 52
+ConfirmBtn.Parent = UnloadPopup
+Instance.new("UICorner", ConfirmBtn).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", ConfirmBtn).Color = Color3.fromRGB(60, 60, 60)
+
+local CancelBtn = Instance.new("TextButton")
+CancelBtn.Size = UDim2.new(0.4, 0, 0, 30)
+CancelBtn.Position = UDim2.new(1, -115, 1, -45)
+CancelBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+CancelBtn.Text = "Cancel"
+CancelBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+CancelBtn.Font = Enum.Font.GothamSemibold
+CancelBtn.TextSize = 12
+CancelBtn.ZIndex = 52
+CancelBtn.Parent = UnloadPopup
+Instance.new("UICorner", CancelBtn).CornerRadius = UDim.new(0, 8)
+
+-- Logika Tombol Unload di Settings Panel
+UnloadBtn.MouseButton1Click:Connect(function()
+    UnloadOverlay.Visible = true
+    TweenService:Create(UnloadOverlay, TweenInfo.new(0.2), {BackgroundTransparency = 0.5}):Play()
+end)
+
+CancelBtn.MouseButton1Click:Connect(function()
+    local tw = TweenService:Create(UnloadOverlay, TweenInfo.new(0.2), {BackgroundTransparency = 1})
+    tw:Play()
+    tw.Completed:Connect(function() UnloadOverlay.Visible = false end)
+end)
+
+ConfirmBtn.MouseButton1Click:Connect(function()
+    IronSoulGui:Destroy()
+end)
+
+-- ==========================================
 -- BUAT TAB & SET TAB PERTAMA AKTIF DEFAULT
+-- ==========================================
 local CombatTab = CreateTab("⚔️ Combat")
-local DungeonTab = CreateTab("🏰 Dungeon")
-local EquipTab = CreateTab("🔨 Equipment")
+local RunsTab = CreateTab("👁️ Runs")
+local GearTab = CreateTab("⭐ Gear")
+local PetsTab = CreateTab("✨ Pets")
 local MiscTab = CreateTab("🔗 Misc")
-local SettingTab = CreateTab("⚙️ Interface")
+local InterfaceTab = CreateTab("⚙️ Interface")
 
 Tabs[1].BackgroundTransparency = 0.2
 Tabs[1].TextColor3 = Color3.fromRGB(255, 220, 100)
@@ -393,8 +470,9 @@ Pages[1].Visible = true
 -- MENGEMBALIKAN TAB AGAR BISA DIPANGGIL OLEH FILE MAIN.LUA
 return {
     Combat = CombatTab,
-    Dungeon = DungeonTab,
-    Equipment = EquipTab,
+    Runs = RunsTab,
+    Gear = GearTab,
+    Pets = PetsTab,
     Misc = MiscTab,
-    Interface = SettingTab
+    Interface = InterfaceTab
 }
