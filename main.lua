@@ -6,7 +6,8 @@ local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 
 -- PANGGIL TAMPILAN HUD (WAJIB GANTI LINK INI DENGAN RAW LINK HUD.LUA ANDA!)
-local HUD = loadstring(game:HttpGet("LINK_RAW_HUD_LUA_ANDA"))()
+local HUD = loadstring(game:HttpGet("https://raw.githubusercontent.com/Adit013/Eternal-HUB/main/hud.lua
+"))()
 
 -- FUNGSI UI BUILDER
 local function CreateToggle(parent, title, defaultState, callback)
@@ -37,6 +38,43 @@ local function CreateLabel(parent, text)
     lbl.TextSize = 12
     lbl.TextXAlignment = Enum.TextXAlignment.Left
 end
+
+local function CreateTextBox(parent, title, placeholder, callback)
+    local Container = Instance.new("Frame", parent)
+    Container.Size = UDim2.new(1, -10, 0, 60)
+    Container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    Instance.new("UICorner", Container).CornerRadius = UDim.new(0, 8)
+    Instance.new("UIStroke", Container).Color = Color3.fromRGB(60, 60, 60)
+
+    local Title = Instance.new("TextLabel", Container)
+    Title.Size = UDim2.new(1, -10, 0, 25)
+    Title.Position = UDim2.new(0, 10, 0, 5)
+    Title.BackgroundTransparency = 1
+    Title.Text = title
+    Title.TextColor3 = Color3.fromRGB(220, 220, 220)
+    Title.Font = Enum.Font.GothamMedium
+    Title.TextSize = 12
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+
+    local InputBox = Instance.new("TextBox", Container)
+    InputBox.Size = UDim2.new(1, -20, 0, 25)
+    InputBox.Position = UDim2.new(0, 10, 0, 30)
+    InputBox.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    InputBox.PlaceholderText = placeholder
+    InputBox.Text = ""
+    InputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    InputBox.Font = Enum.Font.Gotham
+    InputBox.TextSize = 11
+    InputBox.TextXAlignment = Enum.TextXAlignment.Left
+    InputBox.ClearTextOnFocus = false
+    Instance.new("UICorner", InputBox).CornerRadius = UDim.new(0, 6)
+
+    -- Logika menyimpan teks saat selesai mengetik
+    InputBox.FocusLost:Connect(function()
+        callback(InputBox.Text)
+    end)
+end
+
 
 local function IsInGame() return workspace:FindFirstChild("Enemies") ~= nil end
 
@@ -118,23 +156,36 @@ CreateToggle(HUD.Combat, "Auto Progress", false, function(state)
     task.spawn(function()
         while getgenv().AutoProgress do
             if IsInGame() then
-                -- Bypass Teleport ke Portal/Pintu jika terdeteksi
-                for _, portal in pairs(workspace:GetChildren()) do
-                    if portal.Name == "Portal" or portal.Name == "NextRoomDoor" then
+                -- Mencari semua objek di map yang berbau pintu atau portal
+                for _, obj in pairs(workspace:GetChildren()) do
+                    local objName = obj.Name:lower()
+                    if objName:match("door") or objName:match("portal") or objName:match("gate") then
                         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                            local prompt = portal:FindFirstChildWhichIsA("ProximityPrompt", true)
-                            if prompt then fireproximityprompt(prompt) else
-                                firetouchinterest(player.Character.HumanoidRootPart, portal, 0)
-                                firetouchinterest(player.Character.HumanoidRootPart, portal, 1)
+                            
+                            -- Cek apakah objek tersebut PINTU (punya tombol E)
+                            local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+                            if prompt then
+                                -- Curangi game: Ubah durasi tahan E menjadi 0 detik agar instan
+                                prompt.HoldDuration = 0 
+                                fireproximityprompt(prompt)
+                                print("Membuka pintu!")
+                            else
+                                -- Jika tidak ada tombol E, berarti PORTAL (tabrakkan badan)
+                                firetouchinterest(player.Character.HumanoidRootPart, obj, 0)
+                                task.wait(0.1) -- Jeda sebentar agar server mendeteksi tabrakan
+                                firetouchinterest(player.Character.HumanoidRootPart, obj, 1)
+                                print("Memasuki portal!")
                             end
+                            
                         end
                     end
                 end
             end
-            task.wait(1)
+            task.wait(1.5) -- Pengecekan setiap 1.5 detik
         end
     end)
 end)
+
 
 -- ==========================================
 -- 👁️ TAB RUNS
@@ -201,11 +252,23 @@ CreateToggle(HUD.Misc, "Auto Claim All Rewards", false, function(state)
     end)
 end)
 
-local WebhookURL = "" -- Nanti kita bisa ubah ini menjadi TextBox input
-CreateToggle(HUD.Misc, "Send Run-end Loot Summary", false, function(state)
-    -- Saat summary muncul, scrap teks ore dari GUI lalu kirim
-    -- Format request:
-    -- local data = {["content"] = "Dungeon Selesai! Ore didapat: ..."}
-    -- local body = HttpService:JSONEncode(data)
-    -- (Butuh input URL Webhook dari pengguna)
+-- ==========================
+-- FITUR WEBHOOK DISCORD
+-- ==========================
+getgenv().WebhookURL = "" 
+getgenv().SendWebhook = false
+
+-- Kolom input URL Webhook
+CreateTextBox(HUD.Misc, "Discord Webhook URL", "https://discord.com/api/webhooks/...", function(text)
+    getgenv().WebhookURL = text
+    print("Webhook URL tersimpan!")
+end)
+
+-- Tombol On/Off untuk mengirim Webhook
+CreateToggle(HUD.Misc, "Run-end loot summary", false, function(state)
+    getgenv().SendWebhook = state
+    
+    if getgenv().SendWebhook and getgenv().WebhookURL == "" then
+        warn("Silakan masukkan URL Webhook terlebih dahulu!")
+    end
 end)
