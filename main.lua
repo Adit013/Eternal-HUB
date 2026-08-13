@@ -6,8 +6,7 @@ local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 
 -- PANGGIL TAMPILAN HUD (WAJIB GANTI LINK INI DENGAN RAW LINK HUD.LUA ANDA!)
-local HUD = loadstring(game:HttpGet("https://raw.githubusercontent.com/Adit013/Eternal-HUB/main/hud.lua
-"))()
+local HUD = loadstring(game:HttpGet("https://raw.githubusercontent.com/Adit013/Eternal-HUB/main/hud.lua"))()
 
 -- FUNGSI UI BUILDER
 local function CreateToggle(parent, title, defaultState, callback)
