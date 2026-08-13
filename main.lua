@@ -107,88 +107,18 @@ CreateToggle(HUD.Combat, "Auto Farm", false, function(state)
     getgenv().AutoFarm = state
     task.spawn(function()
         while getgenv().AutoFarm do
-            if IsInGame() then
-                local target, targetHRP = nil, nil
-                local minDistance = math.huge
-                
-                for _, obj in pairs(workspace:GetDescendants()) do
-                    local valid = false
-                    if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") then
-                        if obj.Name ~= player.Name and obj.Humanoid.Health > 0 then valid = true end
-                        if obj.Name == "Chest" and not getgenv().AttackChest then valid = false end
-                        if obj.Name == "DragonEgg" then
-                            if getgenv().HitDragonEgg then
-                                local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
-                                if prompt then fireproximityprompt(prompt) end
-                                valid = true
-                            else
-                                valid = false
-                            end
-                        end
-                    end
-                    
-                    if valid and obj:FindFirstChild("HumanoidRootPart") then
-                        local mag = (player.Character.HumanoidRootPart.Position - obj.HumanoidRootPart.Position).Magnitude
-                        if not getgenv().ReachDistantWaves or (getgenv().ReachDistantWaves and mag <= getgenv().ReachDistance) then
-                            if mag < minDistance then
-                                minDistance = mag
-                                target = obj
-                                targetHRP = obj.HumanoidRootPart
-                            end
-                        end
-                    end
-                end
-                
-                if target and targetHRP and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                    local hrp = player.Character.HumanoidRootPart
-                    hrp.Velocity = Vector3.new(0,0,0)
-                    -- Teleport presisi di atas musuh/objek
-                    hrp.CFrame = targetHRP.CFrame * CFrame.new(0, 4, 0)
-                    
-                    -- Eksekusi Tool Serang Otomatis
-                    pcall(function()
-                        local tool = player.Character:FindFirstChildOfClass("Tool")
-                        if tool then tool:Activate() end
-                    end)
+            -- Scanner Nama Objek di Map
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
+                    -- Ini akan memprint semua nama musuh yang terdeteksi ke Console Delta
+                    print("Terdeteksi target: " .. obj.Name) 
                 end
             end
-            task.wait(0.05)
+            task.wait(2)
         end
     end)
 end)
 
-CreateToggle(HUD.Combat, "Auto Dodge (AoE)", false, function(state) getgenv().AutoDodge = state end)
-CreateToggle(HUD.Combat, "Reach Distant Waves", false, function(state) getgenv().ReachDistantWaves = state end)
-CreateToggle(HUD.Combat, "Attack Chests", false, function(state) getgenv().AttackChest = state end)
-CreateToggle(HUD.Combat, "Hit Dragon Eggs", false, function(state) getgenv().HitDragonEgg = state end)
-
--- Auto Progress (Pintu & Portal Bypass)
-CreateToggle(HUD.Combat, "Auto Progress", false, function(state)
-    getgenv().AutoProgress = state
-    task.spawn(function()
-        while getgenv().AutoProgress do
-            if IsInGame() then
-                for _, obj in pairs(workspace:GetDescendants()) do
-                    local name = obj.Name:lower()
-                    if name:find("door") or name:find("portal") or name:find("gate") then
-                        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                            local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
-                            if prompt then
-                                prompt.HoldDuration = 0
-                                fireproximityprompt(prompt)
-                            else
-                                firetouchinterest(player.Character.HumanoidRootPart, obj, 0)
-                                task.wait(0.05)
-                                firetouchinterest(player.Character.HumanoidRootPart, obj, 1)
-                            end
-                        end
-                    end
-                end
-            end
-            task.wait(1)
-        end
-    end)
-end)
 
 -- ==========================================
 -- 👁️ TAB RUNS (Leveling & Auto Restart)
