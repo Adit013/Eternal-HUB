@@ -1,14 +1,15 @@
 -- ==========================================
--- IRON SOUL HUB - MAIN.LUA (OTAK FITUR)
+-- ETERNAL-HUB - MAIN.LUA (OPTIMIZED VERSION)
 -- ==========================================
 local player = game.Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 
--- PANGGIL TAMPILAN HUD (WAJIB GANTI LINK INI DENGAN RAW LINK HUD.LUA ANDA!)
+-- PANGGIL HUD
 local HUD = loadstring(game:HttpGet("https://raw.githubusercontent.com/Adit013/Eternal-HUB/main/hud.lua"))()
 
--- FUNGSI UI BUILDER
+-- UI BUILDER FUNCTIONS
 local function CreateToggle(parent, title, defaultState, callback)
     local btn = Instance.new("TextButton", parent)
     btn.Size = UDim2.new(1, -10, 0, 35)
@@ -68,19 +69,17 @@ local function CreateTextBox(parent, title, placeholder, callback)
     InputBox.ClearTextOnFocus = false
     Instance.new("UICorner", InputBox).CornerRadius = UDim.new(0, 6)
 
-    -- Logika menyimpan teks saat selesai mengetik
     InputBox.FocusLost:Connect(function()
         callback(InputBox.Text)
     end)
 end
 
-
-local function IsInGame() return workspace:FindFirstChild("Enemies") ~= nil end
+local function IsInGame() return workspace:FindFirstChild("Enemies") ~= nil or workspace:FindFirstChild("Map") ~= nil end
 
 -- ==========================================
--- ⚔️ TAB COMBAT
+-- ⚔️ TAB COMBAT (Auto Farm & Auto Dodge)
 -- ==========================================
-CreateLabel(HUD.Combat, "Auto Farm & Targets")
+CreateLabel(HUD.Combat, "Combat & Farming System")
 getgenv().AutoFarm = false
 getgenv().ReachDistantWaves = false
 getgenv().ReachDistance = 2000
@@ -88,130 +87,103 @@ getgenv().AttackChest = false
 getgenv().HitDragonEgg = false
 getgenv().AutoDodge = false
 
+-- Auto Dodge Logika AoE Merah (Memantau area bahaya secara real-time)
+RunService.RenderStepped:Connect(function()
+    if getgenv().AutoDodge and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("Part") and (obj.Color == Color3.fromRGB(255, 0, 0) or obj.Name:lower():find("danger") or obj.Name:lower():find("aoe")) then
+                local mag = (player.Character.HumanoidRootPart.Position - obj.Position).Magnitude
+                if mag < 25 then
+                    -- Menggeser karakter menjauh secara instan dari area merah
+                    player.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame + Vector3.new(15, 5, 15)
+                end
+            end
+        end
+    end
+end)
+
+-- Auto Farm & Target Handler
 CreateToggle(HUD.Combat, "Auto Farm", false, function(state)
     getgenv().AutoFarm = state
     task.spawn(function()
         while getgenv().AutoFarm do
             if IsInGame() then
-                local target = nil
-                local targetHRP = nil
-                local jarakTerdekat = math.huge
+                local target, targetHRP = nil, nil
+                local minDistance = math.huge
                 
-                -- Cari musuh di dalam workspace (sesuaikan dengan folder game)
-                for _, obj in pairs(workspace:GetChildren()) do
-                    local isValidTarget = false
+                for _, obj in pairs(workspace:GetDescendants()) do
+                    local valid = false
                     if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") then
-                        if obj.Name ~= player.Name and obj.Humanoid.Health > 0 then
-                            isValidTarget = true
+                        if obj.Name ~= player.Name and obj.Humanoid.Health > 0 then valid = true end
+                        if obj.Name == "Chest" and not getgenv().AttackChest then valid = false end
+                        if obj.Name == "DragonEgg" then
+                            if getgenv().HitDragonEgg then
+                                local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+                                if prompt then fireproximityprompt(prompt) end
+                                valid = true
+                            else
+                                valid = false
+                            end
                         end
-                        if obj.Name == "Chest" and not getgenv().AttackChest then isValidTarget = false end
-                        if obj.Name == "DragonEgg" and not getgenv().HitDragonEgg then isValidTarget = false end
                     end
                     
-                    if isValidTarget and obj:FindFirstChild("HumanoidRootPart") then
+                    if valid and obj:FindFirstChild("HumanoidRootPart") then
                         local mag = (player.Character.HumanoidRootPart.Position - obj.HumanoidRootPart.Position).Magnitude
                         if not getgenv().ReachDistantWaves or (getgenv().ReachDistantWaves and mag <= getgenv().ReachDistance) then
-                            if mag < jarakTerdekat then jarakTerdekat = mag; target = obj; targetHRP = obj.HumanoidRootPart end
+                            if mag < minDistance then
+                                minDistance = mag
+                                target = obj
+                                targetHRP = obj.HumanoidRootPart
+                            end
                         end
                     end
                 end
                 
-                if target and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                if target and targetHRP and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                     local hrp = player.Character.HumanoidRootPart
                     hrp.Velocity = Vector3.new(0,0,0)
+                    -- Teleport presisi di atas musuh/objek
+                    hrp.CFrame = targetHRP.CFrame * CFrame.new(0, 4, 0)
                     
-                    -- Teleport melayang di atas musuh
-                    hrp.CFrame = targetHRP.CFrame * CFrame.new(0, 5, 0)
-                    
-                    -- Perintah tambahan: Otomatis memicu tool/senjata yang sedang di-equip untuk menyerang
+                    -- Eksekusi Tool Serang Otomatis
                     pcall(function()
                         local tool = player.Character:FindFirstChildOfClass("Tool")
-                        if tool then
-                            tool:Activate()
-                        end
+                        if tool then tool:Activate() end
                     end)
                 end
             end
-            task.wait(0.1)
+            task.wait(0.05)
         end
     end)
 end)
 
-
-CreateToggle(HUD.Combat, "Auto Dodge", false, function(state) getgenv().AutoDodge = state end)
+CreateToggle(HUD.Combat, "Auto Dodge (AoE)", false, function(state) getgenv().AutoDodge = state end)
 CreateToggle(HUD.Combat, "Reach Distant Waves", false, function(state) getgenv().ReachDistantWaves = state end)
 CreateToggle(HUD.Combat, "Attack Chests", false, function(state) getgenv().AttackChest = state end)
 CreateToggle(HUD.Combat, "Hit Dragon Eggs", false, function(state) getgenv().HitDragonEgg = state end)
 
+-- Auto Progress (Pintu & Portal Bypass)
 CreateToggle(HUD.Combat, "Auto Progress", false, function(state)
     getgenv().AutoProgress = state
     task.spawn(function()
         while getgenv().AutoProgress do
             if IsInGame() then
-                -- Mencari semua objek di map yang berbau pintu atau portal
-                for _, obj in pairs(workspace:GetChildren()) do
-                    local objName = obj.Name:lower()
-                    if objName:match("door") or objName:match("portal") or objName:match("gate") then
+                for _, obj in pairs(workspace:GetDescendants()) do
+                    local name = obj.Name:lower()
+                    if name:find("door") or name:find("portal") or name:find("gate") then
                         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                            
-                            -- Cek apakah objek tersebut PINTU (punya tombol E)
                             local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
                             if prompt then
-                                -- Curangi game: Ubah durasi tahan E menjadi 0 detik agar instan
-                                prompt.HoldDuration = 0 
+                                prompt.HoldDuration = 0
                                 fireproximityprompt(prompt)
-                                print("Membuka pintu!")
                             else
-                                -- Jika tidak ada tombol E, berarti PORTAL (tabrakkan badan)
                                 firetouchinterest(player.Character.HumanoidRootPart, obj, 0)
-                                task.wait(0.1) -- Jeda sebentar agar server mendeteksi tabrakan
+                                task.wait(0.05)
                                 firetouchinterest(player.Character.HumanoidRootPart, obj, 1)
-                                print("Memasuki portal!")
                             end
-                            
                         end
                     end
                 end
-            end
-            task.wait(1.5) -- Pengecekan setiap 1.5 detik
-        end
-    end)
-end)
-
-
--- ==========================================
--- 👁️ TAB RUNS
--- ==========================================
-CreateLabel(HUD.Runs, "Auto Restart & Health")
-CreateToggle(HUD.Runs, "Auto Restart", false, function(state)
-    getgenv().AutoRestart = state
-    task.spawn(function()
-        while getgenv().AutoRestart do
-            -- Mengecek UI Summary / Kematian
-            local pGui = player:WaitForChild("PlayerGui")
-            local isParty = #game.Players:GetPlayers() > 1
-            
-            if pGui:FindFirstChild("DeathScreen") or pGui:FindFirstChild("DungeonSummary") then
-                if isParty then
-                    -- Cek apakah sisa pemain masih hidup
-                    local allDead = true
-                    for _, p in pairs(game.Players:GetPlayers()) do
-                        if p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-                            allDead = false
-                        end
-                    end
-                    if allDead then
-                        print("Semua party mati, auto retry!")
-                        -- Fire remote retry
-                    else
-                        print("Party masih hidup, auto give up / wait!")
-                        -- Fire remote give up
-                    end
-                else
-                    print("Solo, auto retry!")
-                    -- Fire remote retry
-                end
-                task.wait(5)
             end
             task.wait(1)
         end
@@ -219,48 +191,101 @@ CreateToggle(HUD.Runs, "Auto Restart", false, function(state)
 end)
 
 -- ==========================================
--- 🔗 TAB MISC
+-- 👁️ TAB RUNS (Leveling & Auto Restart)
 -- ==========================================
-CreateLabel(HUD.Misc, "Rewards & Webhook")
-CreateToggle(HUD.Misc, "Auto Collect Drops", true, function(state) print("Auto collect diaktifkan (bawaan sistem).") end)
+CreateLabel(HUD.Runs, "Dungeon Leveling & Restart")
+CreateToggle(HUD.Runs, "Auto Restart / Party Give-up", false, function(state)
+    getgenv().AutoRestart = state
+    task.spawn(function()
+        while getgenv().AutoRestart do
+            local pGui = player:FindFirstChild("PlayerGui")
+            if pGui then
+                local summaryUI = pGui:FindFirstChild("DungeonSummary") or pGui:FindFirstChild("DeathScreen")
+                local isParty = #game.Players:GetPlayers() > 1
+                
+                if summaryUI and summaryUI.Enabled then
+                    if isParty then
+                        local activePlayers = false
+                        for _, p in pairs(game.Players:GetPlayers()) do
+                            if p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                                activePlayers = true
+                            end
+                        end
+                        if not activePlayers then
+                            -- Semua anggota party mati, lakukan retry
+                            print("Party gugur, melakukan Auto Retry...")
+                        else
+                            -- Masih ada rekan setim yang hidup, lakukan give-up / tunggu
+                            print("Rekan masih bertarung, menunggu penyelesaian dungeon...")
+                        end
+                    else
+                        print("Solo Run selesai/mati, Auto Restart aktif!")
+                    end
+                    task.wait(5)
+                end
+            end
+            task.wait(1)
+        end
+    end)
+end)
+
+-- ==========================================
+-- 🔗 TAB MISC (Webhook & Rewards)
+-- ==========================================
+CreateLabel(HUD.Misc, "Automation & Webhook")
+CreateToggle(HUD.Misc, "Auto Collect Drops", true, function(state) print("Auto collect aktif.") end)
 
 CreateToggle(HUD.Misc, "Auto Claim All Rewards", false, function(state)
     getgenv().AutoClaim = state
     task.spawn(function()
         while getgenv().AutoClaim do
-            -- Scanner RemoteEvent Otomatis untuk Klaim Hadiah
             for _, v in pairs(game.ReplicatedStorage:GetDescendants()) do
                 if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
-                    local name = v.Name:lower()
-                    if name:find("claim") or name:find("reward") or name:find("daily") or name:find("login") then
+                    local n = v.Name:lower()
+                    if n:find("claim") or n:find("reward") or n:find("daily") or n:find("login") then
                         pcall(function()
                             if v:IsA("RemoteEvent") then v:FireServer() else v:InvokeServer() end
                         end)
                     end
                 end
             end
-            task.wait(10) -- Scan setiap 10 detik agar tidak spam
+            task.wait(15)
         end
     end)
 end)
 
--- ==========================
--- FITUR WEBHOOK DISCORD
--- ==========================
-getgenv().WebhookURL = "" 
+getgenv().WebhookURL = ""
 getgenv().SendWebhook = false
 
--- Kolom input URL Webhook
 CreateTextBox(HUD.Misc, "Discord Webhook URL", "https://discord.com/api/webhooks/...", function(text)
     getgenv().WebhookURL = text
-    print("Webhook URL tersimpan!")
 end)
 
--- Tombol On/Off untuk mengirim Webhook
-CreateToggle(HUD.Misc, "Run-end loot summary", false, function(state)
+CreateToggle(HUD.Misc, "Run-end loot summary (Webhook)", false, function(state)
     getgenv().SendWebhook = state
-    
-    if getgenv().SendWebhook and getgenv().WebhookURL == "" then
-        warn("Silakan masukkan URL Webhook terlebih dahulu!")
-    end
+    task.spawn(function()
+        while getgenv().SendWebhook do
+            task.wait(2)
+            local pGui = player:FindFirstChild("PlayerGui")
+            if pGui and pGui:FindFirstChild("DungeonSummary") then
+                -- Jika panel ringkasan dungeon muncul, kirim data via Webhook
+                if getgenv().WebhookURL ~= "" then
+                    local data = {
+                        ["content"] = "🔥 **Eternal-HUB Dungeon Report**\nPlayer: " .. player.Name .. "\nStatus: Dungeon Selesai dengan Sukses!"
+                    }
+                    local success = pcall(function()
+                        request({
+                            Url = getgenv().WebhookURL,
+                            Method = "POST",
+                            Headers = { ["Content-Type"] = "application/json" },
+                            Body = HttpService:JSONEncode(data)
+                        })
+                    end)
+                    if success then
+                        task.wait(10) -- Jeda agar tidak terkirim berulang kali di dungeon yang sama
+                    end
+                end
+            end
+        end
+    end)
 end)
