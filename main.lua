@@ -3,14 +3,12 @@
 -- ==========================================
 local player = game.Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 
--- 1. PANGGIL TAMPILAN HUD (WAJIB GANTI LINK INI!)
--- Ganti tulisan "LINK_RAW_HUD_LUA_ANDA" dengan link raw file hud.lua Anda di GitHub
-local HUD = loadstring(game:HttpGet("https://raw.githubusercontent.com/Adit013/Eternal-HUB/main/hud.lua"))()
+-- PANGGIL TAMPILAN HUD (WAJIB GANTI LINK INI DENGAN RAW LINK HUD.LUA ANDA!)
+local HUD = loadstring(game:HttpGet("LINK_RAW_HUD_LUA_ANDA"))()
 
--- ==========================================
--- FUNGSI BANTUAN PEMBUAT UI (TOMBOL, SLIDER, DROPDOWN)
--- ==========================================
+-- FUNGSI UI BUILDER
 local function CreateToggle(parent, title, defaultState, callback)
     local btn = Instance.new("TextButton", parent)
     btn.Size = UDim2.new(1, -10, 0, 35)
@@ -20,7 +18,6 @@ local function CreateToggle(parent, title, defaultState, callback)
     btn.Font = Enum.Font.GothamSemibold
     btn.TextSize = 13
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-
     local state = defaultState
     btn.MouseButton1Click:Connect(function()
         state = not state
@@ -41,44 +38,69 @@ local function CreateLabel(parent, text)
     lbl.TextXAlignment = Enum.TextXAlignment.Left
 end
 
--- ==========================================
--- SISTEM PENGECEKAN WORLD
--- ==========================================
-local function IsInGame()
-    -- Cek apakah karakter ada di dalam zona pertarungan/dungeon
-    return workspace:FindFirstChild("Enemies") ~= nil 
-end
+local function IsInGame() return workspace:FindFirstChild("Enemies") ~= nil end
 
 -- ==========================================
--- TAHAP 1: FITUR COMBAT
+-- ⚔️ TAB COMBAT
 -- ==========================================
-CreateLabel(HUD.Combat, "⚔️ AUTO FARM SETTINGS")
-
+CreateLabel(HUD.Combat, "Auto Farm & Targets")
 getgenv().AutoFarm = false
-getgenv().TinggiDariMusuh = 5
-getgenv().JarakBelakang = 0
-getgenv().AutoSkill = false
+getgenv().ReachDistantWaves = false
+getgenv().ReachDistance = 2000
+getgenv().AttackChest = false
+getgenv().HitDragonEgg = false
+getgenv().AutoDodge = false
 
-CreateToggle(HUD.Combat, "Aktifkan Auto Farm", false, function(state)
+CreateToggle(HUD.Combat, "Auto Farm", false, function(state)
     getgenv().AutoFarm = state
     task.spawn(function()
         while getgenv().AutoFarm do
             if IsInGame() then
                 local target = nil
+                local targetHRP = nil
                 local jarakTerdekat = math.huge
+                
+                -- Deteksi Musuh, Chest, atau Telur Naga
                 for _, obj in pairs(workspace:GetChildren()) do
-                    if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") and obj.Name ~= player.Name then
-                        if obj.Humanoid.Health > 0 then
-                            local mag = (player.Character.HumanoidRootPart.Position - obj.HumanoidRootPart.Position).Magnitude
-                            if mag < jarakTerdekat then jarakTerdekat = mag; target = obj end
+                    local isValidTarget = false
+                    if obj:FindFirstChild("Humanoid") and obj.Humanoid.Health > 0 then
+                        if obj.Name ~= player.Name then isValidTarget = true end
+                        if obj.Name == "Chest" and not getgenv().AttackChest then isValidTarget = false end
+                        if obj.Name == "DragonEgg" and getgenv().HitDragonEgg then
+                            -- Trigger Telur Naga jika ada ProximityPrompt
+                            local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+                            if prompt then fireproximityprompt(prompt) end
+                            isValidTarget = true
+                        elseif obj.Name == "DragonEgg" and not getgenv().HitDragonEgg then
+                            isValidTarget = false
+                        end
+                    end
+                    
+                    if isValidTarget and obj:FindFirstChild("HumanoidRootPart") then
+                        local mag = (player.Character.HumanoidRootPart.Position - obj.HumanoidRootPart.Position).Magnitude
+                        -- Logika Reach Distant Waves
+                        if not getgenv().ReachDistantWaves or (getgenv().ReachDistantWaves and mag <= getgenv().ReachDistance) then
+                            if mag < jarakTerdekat then jarakTerdekat = mag; target = obj; targetHRP = obj.HumanoidRootPart end
+                        end
+                    end
+                end
+                
+                -- Logika Auto Dodge AoE Merah
+                local dodgeOffset = CFrame.new(0, 5, 0)
+                if getgenv().AutoDodge then
+                    for _, aoe in pairs(workspace:GetChildren()) do
+                        if aoe:IsA("Part") and aoe.Color == Color3.fromRGB(255,0,0) and aoe.Transparency > 0 then
+                            local aoeMag = (player.Character.HumanoidRootPart.Position - aoe.Position).Magnitude
+                            if aoeMag < (aoe.Size.X / 2) + 20 then -- 20 studs safety margin
+                                dodgeOffset = CFrame.new(0, 20, 20) -- Mundur kejut
+                            end
                         end
                     end
                 end
                 
                 if target and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                    local hrp = player.Character.HumanoidRootPart
-                    hrp.Velocity = Vector3.new(0,0,0) -- Anti terpental
-                    hrp.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, getgenv().TinggiDariMusuh, getgenv().JarakBelakang)
+                    player.Character.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
+                    player.Character.HumanoidRootPart.CFrame = targetHRP.CFrame * dodgeOffset
                 end
             end
             task.wait(0.1)
@@ -86,72 +108,104 @@ CreateToggle(HUD.Combat, "Aktifkan Auto Farm", false, function(state)
     end)
 end)
 
-CreateToggle(HUD.Combat, "Aktifkan Auto Skill (1, 2, Ulti)", false, function(state)
-    getgenv().AutoSkill = state
-    -- Logika eksekusi skill ditaruh di sini nanti setelah tahu RemoteEvent-nya
-end)
+CreateToggle(HUD.Combat, "Auto Dodge", false, function(state) getgenv().AutoDodge = state end)
+CreateToggle(HUD.Combat, "Reach Distant Waves", false, function(state) getgenv().ReachDistantWaves = state end)
+CreateToggle(HUD.Combat, "Attack Chests", false, function(state) getgenv().AttackChest = state end)
+CreateToggle(HUD.Combat, "Hit Dragon Eggs", false, function(state) getgenv().HitDragonEgg = state end)
 
-CreateToggle(HUD.Combat, "Aktifkan Noclip", false, function(state)
-    -- Logika Noclip (Tembus tembok saat auto farm)
-end)
-
--- ==========================================
--- TAHAP 2: FITUR DUNGEON
--- ==========================================
-CreateLabel(HUD.Dungeon, "🏰 AUTO DUNGEON SETTINGS")
-
-CreateToggle(HUD.Dungeon, "Mulai Auto Dungeon", false, function(state)
-    -- Logika masuk dungeon otomatis
-end)
-
-CreateToggle(HUD.Dungeon, "Auto Restart / Retry", true, function(state)
-    -- Logika klik tombol retry saat dungeon selesai/mati
-end)
-
-CreateToggle(HUD.Dungeon, "Auto Collect (HP/EXP/Coin)", true, function(state)
-    -- Logika magnet/teleport ke drop item
-end)
-
--- ==========================================
--- TAHAP 3: FITUR EQUIPMENT
--- ==========================================
-CreateLabel(HUD.Equipment, "🔨 FORGE SETTINGS")
-
-CreateToggle(HUD.Equipment, "Auto Perfect Forge", false, function(state)
-    -- Logika bypass/auto klik minigame forge
-end)
-
--- ==========================================
--- TAHAP 4: FITUR MISC
--- ==========================================
-CreateLabel(HUD.Misc, "🔗 WEBHOOK & FPS")
-
--- (Untuk TextBox URL Webhook butuh elemen UI khusus, sementara diganti Toggle aktif/mati)
-CreateToggle(HUD.Misc, "Kirim Summary ke Discord", false, function(state)
-    -- Logika pengiriman HTTP Post ke Webhook
-end)
-
-CreateToggle(HUD.Misc, "FPS Optimizer (No VFX/Pets)", false, function(state)
-    if state then
-        -- Menghapus tekstur dan efek agar tidak lag
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic end
-            if v:IsA("ParticleEmitter") then v.Enabled = false end
+CreateToggle(HUD.Combat, "Auto Progress", false, function(state)
+    getgenv().AutoProgress = state
+    task.spawn(function()
+        while getgenv().AutoProgress do
+            if IsInGame() then
+                -- Bypass Teleport ke Portal/Pintu jika terdeteksi
+                for _, portal in pairs(workspace:GetChildren()) do
+                    if portal.Name == "Portal" or portal.Name == "NextRoomDoor" then
+                        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            local prompt = portal:FindFirstChildWhichIsA("ProximityPrompt", true)
+                            if prompt then fireproximityprompt(prompt) else
+                                firetouchinterest(player.Character.HumanoidRootPart, portal, 0)
+                                firetouchinterest(player.Character.HumanoidRootPart, portal, 1)
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(1)
         end
-    end
+    end)
 end)
 
 -- ==========================================
--- TAHAP 5: FITUR INTERFACE
+-- 👁️ TAB RUNS
 -- ==========================================
-CreateLabel(HUD.Interface, "⚙️ SYSTEM SETTINGS")
-
-CreateToggle(HUD.Interface, "Auto Reconnect", true, function(state)
-    -- Logika anti-disconnect / Rejoin server
+CreateLabel(HUD.Runs, "Auto Restart & Health")
+CreateToggle(HUD.Runs, "Auto Restart", false, function(state)
+    getgenv().AutoRestart = state
+    task.spawn(function()
+        while getgenv().AutoRestart do
+            -- Mengecek UI Summary / Kematian
+            local pGui = player:WaitForChild("PlayerGui")
+            local isParty = #game.Players:GetPlayers() > 1
+            
+            if pGui:FindFirstChild("DeathScreen") or pGui:FindFirstChild("DungeonSummary") then
+                if isParty then
+                    -- Cek apakah sisa pemain masih hidup
+                    local allDead = true
+                    for _, p in pairs(game.Players:GetPlayers()) do
+                        if p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                            allDead = false
+                        end
+                    end
+                    if allDead then
+                        print("Semua party mati, auto retry!")
+                        -- Fire remote retry
+                    else
+                        print("Party masih hidup, auto give up / wait!")
+                        -- Fire remote give up
+                    end
+                else
+                    print("Solo, auto retry!")
+                    -- Fire remote retry
+                end
+                task.wait(5)
+            end
+            task.wait(1)
+        end
+    end)
 end)
 
-CreateToggle(HUD.Interface, "Auto Execute (Server Hop)", true, function(state)
-    -- Logika sinkronisasi file auto-execute
+-- ==========================================
+-- 🔗 TAB MISC
+-- ==========================================
+CreateLabel(HUD.Misc, "Rewards & Webhook")
+CreateToggle(HUD.Misc, "Auto Collect Drops", true, function(state) print("Auto collect diaktifkan (bawaan sistem).") end)
+
+CreateToggle(HUD.Misc, "Auto Claim All Rewards", false, function(state)
+    getgenv().AutoClaim = state
+    task.spawn(function()
+        while getgenv().AutoClaim do
+            -- Scanner RemoteEvent Otomatis untuk Klaim Hadiah
+            for _, v in pairs(game.ReplicatedStorage:GetDescendants()) do
+                if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
+                    local name = v.Name:lower()
+                    if name:find("claim") or name:find("reward") or name:find("daily") or name:find("login") then
+                        pcall(function()
+                            if v:IsA("RemoteEvent") then v:FireServer() else v:InvokeServer() end
+                        end)
+                    end
+                end
+            end
+            task.wait(10) -- Scan setiap 10 detik agar tidak spam
+        end
+    end)
 end)
 
-print("Main.lua Berhasil Dimuat dan Dihubungkan ke HUD!")
+local WebhookURL = "" -- Nanti kita bisa ubah ini menjadi TextBox input
+CreateToggle(HUD.Misc, "Send Run-end Loot Summary", false, function(state)
+    -- Saat summary muncul, scrap teks ore dari GUI lalu kirim
+    -- Format request:
+    -- local data = {["content"] = "Dungeon Selesai! Ore didapat: ..."}
+    -- local body = HttpService:JSONEncode(data)
+    -- (Butuh input URL Webhook dari pengguna)
+end)
