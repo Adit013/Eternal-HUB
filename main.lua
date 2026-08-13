@@ -97,53 +97,46 @@ CreateToggle(HUD.Combat, "Auto Farm", false, function(state)
                 local targetHRP = nil
                 local jarakTerdekat = math.huge
                 
-                -- Deteksi Musuh, Chest, atau Telur Naga
+                -- Cari musuh di dalam workspace (sesuaikan dengan folder game)
                 for _, obj in pairs(workspace:GetChildren()) do
                     local isValidTarget = false
-                    if obj:FindFirstChild("Humanoid") and obj.Humanoid.Health > 0 then
-                        if obj.Name ~= player.Name then isValidTarget = true end
-                        if obj.Name == "Chest" and not getgenv().AttackChest then isValidTarget = false end
-                        if obj.Name == "DragonEgg" and getgenv().HitDragonEgg then
-                            -- Trigger Telur Naga jika ada ProximityPrompt
-                            local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
-                            if prompt then fireproximityprompt(prompt) end
+                    if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") then
+                        if obj.Name ~= player.Name and obj.Humanoid.Health > 0 then
                             isValidTarget = true
-                        elseif obj.Name == "DragonEgg" and not getgenv().HitDragonEgg then
-                            isValidTarget = false
                         end
+                        if obj.Name == "Chest" and not getgenv().AttackChest then isValidTarget = false end
+                        if obj.Name == "DragonEgg" and not getgenv().HitDragonEgg then isValidTarget = false end
                     end
                     
                     if isValidTarget and obj:FindFirstChild("HumanoidRootPart") then
                         local mag = (player.Character.HumanoidRootPart.Position - obj.HumanoidRootPart.Position).Magnitude
-                        -- Logika Reach Distant Waves
                         if not getgenv().ReachDistantWaves or (getgenv().ReachDistantWaves and mag <= getgenv().ReachDistance) then
                             if mag < jarakTerdekat then jarakTerdekat = mag; target = obj; targetHRP = obj.HumanoidRootPart end
                         end
                     end
                 end
                 
-                -- Logika Auto Dodge AoE Merah
-                local dodgeOffset = CFrame.new(0, 5, 0)
-                if getgenv().AutoDodge then
-                    for _, aoe in pairs(workspace:GetChildren()) do
-                        if aoe:IsA("Part") and aoe.Color == Color3.fromRGB(255,0,0) and aoe.Transparency > 0 then
-                            local aoeMag = (player.Character.HumanoidRootPart.Position - aoe.Position).Magnitude
-                            if aoeMag < (aoe.Size.X / 2) + 20 then -- 20 studs safety margin
-                                dodgeOffset = CFrame.new(0, 20, 20) -- Mundur kejut
-                            end
-                        end
-                    end
-                end
-                
                 if target and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                    player.Character.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
-                    player.Character.HumanoidRootPart.CFrame = targetHRP.CFrame * dodgeOffset
+                    local hrp = player.Character.HumanoidRootPart
+                    hrp.Velocity = Vector3.new(0,0,0)
+                    
+                    -- Teleport melayang di atas musuh
+                    hrp.CFrame = targetHRP.CFrame * CFrame.new(0, 5, 0)
+                    
+                    -- Perintah tambahan: Otomatis memicu tool/senjata yang sedang di-equip untuk menyerang
+                    pcall(function()
+                        local tool = player.Character:FindFirstChildOfClass("Tool")
+                        if tool then
+                            tool:Activate()
+                        end
+                    end)
                 end
             end
             task.wait(0.1)
         end
     end)
 end)
+
 
 CreateToggle(HUD.Combat, "Auto Dodge", false, function(state) getgenv().AutoDodge = state end)
 CreateToggle(HUD.Combat, "Reach Distant Waves", false, function(state) getgenv().ReachDistantWaves = state end)
